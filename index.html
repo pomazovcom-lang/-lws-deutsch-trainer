@@ -2,6 +2,28 @@
 :root{--bg:#f4f6f8;--card:#fff;--text:#202124;--muted:#6b7280;--accent:#111827;--ok:#167c3a;--bad:#c62828;--border:#d8dce2}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}.app{max-width:920px;margin:auto;padding:16px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.settings-toggle{margin-top:10px;width:100%;text-align:left}.settings-panel{margin-top:8px}h1{margin:0;font-size:25px}.sub{color:var(--muted);margin-top:4px}.compact-panel{padding:12px}.panel{background:var(--card);border-radius:18px;padding:16px;margin-top:12px;box-shadow:0 2px 12px #0000000d}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}.controls select{width:100%;padding:12px;border:1px solid var(--border);border-radius:11px;background:white;font-size:16px}.stats{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:14px}.card{text-align:center;padding:46px 16px 30px;position:relative}.timer{position:absolute;top:14px;right:16px;font-size:16px;font-weight:700;line-height:1;min-width:32px;height:32px;padding:8px;border-radius:50%;background:#eef1f5;color:var(--muted);display:flex;align-items:center;justify-content:center}.timer.red{color:var(--bad);background:#fdecec}.prompt{font-size:42px;font-weight:800;line-height:1.15;margin:10px 0 14px;min-height:50px}.direction{color:var(--muted);font-size:14px}.inputrow{display:flex;gap:8px;margin-top:15px}.inputrow input{flex:1;min-width:0;padding:14px;border:1px solid var(--border);border-radius:12px;font-size:20px}.btn{padding:12px 15px;border:0;border-radius:11px;background:#e8ebef;font-size:16px}.primary{background:var(--accent);color:#fff}.voice{margin-top:9px}.result{min-height:30px;margin-top:14px;font-size:18px;font-weight:650}.ok{color:var(--ok)}.bad{color:var(--bad)}.correct{font-size:25px;margin-top:7px;min-height:34px}.example{margin-top:16px;color:#555;font-size:15px}.hidden{display:none}.lessonGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.lesson{padding:12px 8px;border:1px solid var(--border);background:#fff;border-radius:11px}.lesson.active{background:#111;color:white}.footer{font-size:13px;color:var(--muted);line-height:1.45}@media(max-width:650px){.controls{grid-template-columns:1fr}.prompt{font-size:34px}.lessonGrid{grid-template-columns:repeat(3,1fr)}.inputrow{flex-wrap:wrap}.inputrow input{flex-basis:100%}}
 
+
+/* iPhone keyboard mode: keep the important information above the keyboard */
+body.keyboard-open .app{padding-bottom:8px}
+body.keyboard-open .top,body.keyboard-open .settings-toggle,body.keyboard-open .settings-panel,body.keyboard-open .footer{display:none}
+body.keyboard-open .panel.card{margin-top:6px;padding:12px 10px 10px;box-shadow:none}
+body.keyboard-open .prompt{font-size:30px;margin:4px 0 8px;min-height:36px}
+body.keyboard-open .direction{font-size:12px}
+body.keyboard-open .inputrow{margin-top:8px}
+body.keyboard-open .inputrow.voice,body.keyboard-open .answer-help,body.keyboard-open #correct,body.keyboard-open #example{display:none}
+body.keyboard-open #result{margin:7px 0 4px;min-height:28px;font-size:16px;line-height:1.25}
+body.keyboard-open .card{display:flex;flex-direction:column}
+body.keyboard-open #directionText{order:1}
+body.keyboard-open #prompt{order:2}
+body.keyboard-open #result{order:3}
+body.keyboard-open #correct{order:4}
+body.keyboard-open .inputrow:not(.voice){order:5}
+
+body.keyboard-open #input{font-size:19px;min-height:48px;padding:10px 12px}
+body.keyboard-open #check{min-height:48px;padding:10px 12px}
+.timer{visibility:hidden}
+.timer.active{visibility:visible}
+
 /* Mobile answer area */
 @media (max-width: 700px){
   #input{font-size:20px;min-height:52px;padding:12px 14px;}
@@ -70,22 +92,40 @@ function startTraining(){
 }
 function stopTraining(){state.training=false;stopTimer();stopRecognition();state.current=null;state.session=null;$('card').classList.add('hidden');$('wait').classList.remove('hidden');$('wait').innerHTML='<div style="text-align:center;padding:12px"><h2 style="margin:4px 0 10px">⏸️ Тренування зупинено</h2><div style="color:#666">Натисни «Почати», щоб розпочати новий пакет із 6 слів.</div></div>';updateTrainingButtons()}
 function updateTrainingButtons(){$('start').disabled=!!state.training;$('stop').disabled=!state.training;}
+function keyboardMode(){
+  const vv=window.visualViewport;
+  if(!vv)return;
+  const keyboardOpen=(window.innerHeight-vv.height)>120;
+  document.body.classList.toggle('keyboard-open',keyboardOpen);
+  if(keyboardOpen&&state.current){
+    requestAnimationFrame(()=>{
+      const r=$('input').getBoundingClientRect();
+      const safeBottom=vv.height-12;
+      if(r.bottom>safeBottom)$('input').scrollIntoView({block:'center',behavior:'auto'});
+      const rr=$('result').getBoundingClientRect();
+      if(rr.bottom>safeBottom)$('result').scrollIntoView({block:'center',behavior:'auto'});
+    });
+  }
+}
+if(window.visualViewport){window.visualViewport.addEventListener('resize',keyboardMode);window.visualViewport.addEventListener('scroll',keyboardMode)}
+window.addEventListener('resize',keyboardMode);
+
 function show(){
  if(!state.training)return;updateStats();
  if(!state.session){state.session=makeSession();if(!state.session){$('card').classList.add('hidden');$('wait').classList.remove('hidden');$('wait').textContent='⏳ Немає доступних слів.';return}}
  if(!state.session.queue.length){if(state.session.round<3 && state.session.remaining.length){state.session.round++;state.session.queue=shuffle(state.session.remaining.slice());state.session.remaining=[]}else{showSummary();return}}
  $('wait').classList.add('hidden');$('card').classList.remove('hidden');state.current=state.session.queue.shift();const w=state.current;
  $('prompt').textContent=state.dir==='deuk'?w.de:w.uk;$('directionText').textContent=state.dir==='deuk'?'Німецьке слово → скажи українське':'Українське слово → скажи німецьке';$('input').value='';$('result').textContent='🎤 Натисни мікрофон на клавіатурі iPhone і скажи відповідь';$('result').className='result';$('correct').textContent='';$('example').textContent='';resetTimerDisplay();if(state.dir==='deuk'&&state.soundUnlocked)speak(w.de);updateStats();
- setTimeout(()=>{const input=$('input');input.focus();input.scrollIntoView({block:'center',behavior:'smooth'});},120);
+ setTimeout(()=>{const input=$('input');input.focus();input.scrollIntoView({block:'center',behavior:'smooth'});keyboardMode();},120);
 }
-function finishAttempt(ok,reason=''){if(!state.current)return;stopTimer();stopRecognition();const w=state.current;const raw=$('input').value.trim();$('correct').textContent=state.dir==='deuk'?w.uk:w.de;if(ok){$('result').textContent='✓ Правильно — почув: '+(raw||'—');$('result').className='result ok';schedule(w,true);state.session.done.push({id:w.id,ok:true,word:w});}else{$('result').textContent=reason==='timeout'?'— Час вийшов'+(raw?' — почув: '+raw:''):'✗ Неправильно — почув: '+(raw||'нічого');$('result').className='result bad';schedule(w,false);state.session.remaining.push(w);state.session.done.push({id:w.id,ok:false,word:w});}const ex=w.examples?.[0];if(ex)$('example').textContent='Beispiel: '+ex.de+(ex.uk?' — '+ex.uk:'');state.current=null;setTimeout(show,ok?700:1800)}
+function finishAttempt(ok,reason=''){if(!state.current)return;stopTimer();resetTimerDisplay();stopRecognition();const w=state.current;const raw=$('input').value.trim();$('correct').textContent=state.dir==='deuk'?w.uk:w.de;if(ok){$('result').textContent='✓ Правильно — почув: '+(raw||'—');$('result').className='result ok';schedule(w,true);state.session.done.push({id:w.id,ok:true,word:w});}else{$('result').textContent=reason==='timeout'?'— Час вийшов'+(raw?' — почув: '+raw:''):'✗ Неправильно — почув: '+(raw||'нічого');$('result').className='result bad';schedule(w,false);state.session.remaining.push(w);state.session.done.push({id:w.id,ok:false,word:w});}const ex=w.examples?.[0];if(ex)$('example').textContent='Beispiel: '+ex.de+(ex.uk?' — '+ex.uk:'');state.current=null;setTimeout(show,ok?700:1800)}
 function check(){if(!state.current)return;const ans=norm($('input').value);if(!ans){$('result').textContent='🎤 Нічого не розпізнано — скажи ще раз.';$('result').className='result bad';return}const ok=answerForms(state.current,state.dir).includes(ans);finishAttempt(ok)}
 function timeout(){if(!state.current)return;finishAttempt(false,'timeout')}
 function stopRecognition(){if(state.recognition){try{state.recognition.abort()}catch(e){} }state.recognizing=false;const btn=$('voice');if(btn)btn.textContent='🎙️ Мікрофон'}
 function activateVoice(){
  if(!state.training||!state.current)return;
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR){$('input').focus();$('input').scrollIntoView({block:'center',behavior:'smooth'});$('result').textContent='🔴 Говори в мікрофон 🎤 клавіатури iPhone';$('result').className='result';return;}
+ if(!SR){$('input').focus();$('input').scrollIntoView({block:'center',behavior:'smooth'});keyboardMode();$('result').textContent='🔴 Говори в мікрофон 🎤 клавіатури iPhone';$('result').className='result';return;}
  if(state.recognizing)return;
  if(!state.timerStarted)startTimer();
  state.recognition.lang=state.dir==='deuk'?'uk-UA':'de-DE';state.recognizing=true;$('voice').textContent='🔴 Слухаю…';$('result').textContent='🔴 Слухаю…';$('result').className='result';
@@ -105,14 +145,14 @@ $('lesson').onchange=setLesson;
 $('direction').onchange=()=>{state.dir=$('direction').value;state.session=null;state.packHistory=new Set();if(state.training)show()};
 $('check').onclick=check;
 let inputDebounce=null;
-$('input').addEventListener('input',()=>{
+$('input').addEventListener('input',()=>{keyboardMode();
   if(!state.current)return;
   const value=norm($('input').value);
   if(!value)return;
   if(!state.timerStarted)startTimer();
   clearTimeout(inputDebounce);
   // Диктування iPhone вставляє текст у поле; перевіряємо автоматично.
-  inputDebounce=setTimeout(()=>{if(state.current&&norm($('input').value))check()},350);
+  inputDebounce=setTimeout(()=>{if(state.current&&norm($('input').value))check()},700);
 });
 $('input').onkeydown=e=>{if(e.key==='Enter')check()};
 $('repeat').onclick=()=>{if(state.current)speak(state.current.de)};
